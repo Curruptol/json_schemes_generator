@@ -1,0 +1,92 @@
+{
+  "VARIABLES": {
+    "content_types": [
+      "application/json",
+      "application/json; charset=utf-8",
+      "application/scim+json; charset=UTF-8",
+      ""
+    ],
+    "max_retries": 3,
+    "json_schema_options": {
+      "schemaVersion": "http://json-schema.org/draft-04/schema#",
+      "additionalProperties": false,
+      "additionalItems": false,
+      "nullable": true,
+      "enableArray": true,
+      "stringMinLength": 0,
+      "stringMaxLengths": [
+        255,
+        4096,
+        8192
+      ],
+      "arrayMaxItems": 65536,
+      "arrayMinItems": 0,
+      "numberMinimum": 0,
+      "numberMaximum": 999999999999,
+      "timestampFormat": "date-time"
+    }
+  },
+  "REPLACE_PATTERNS": {
+    "url": [
+      {
+        "pattern": "r\\w+-\\w+-\\w+-\\w+-\\w+",
+        "replace": "\\\\w+-\\\\w+-\\\\w+-\\\\w+-\\\\w+"
+      },
+      {
+        "pattern": "r\\{.*\\}",
+        "replace": ".*"
+      },
+      {
+        "pattern": "rqs00009/",
+        "replace": ""
+      },
+      {
+        "pattern": "rscim_sigma/",
+        "replace": ""
+      }
+    ],
+    "api_path": [
+      {
+        "pattern": "r\\w+-\\w+-\\w+-\\w+-\\w+",
+        "replace": "UUID"
+      },
+      {
+        "pattern": "r\\{",
+        "replace": "__"
+      },
+      {
+        "pattern": "r\\}",
+        "replace": "__"
+      },
+      {
+        "pattern": "rqs00009/",
+        "replace": "qs_path/"
+      },
+      {
+        "pattern": "rscim_sigma/",
+        "replace": ""
+      }
+    ]
+  },
+  "DUMP_FILES_DIR": "../dumps",
+  "HAR_FILES_DIR": "../dumps/har",
+  "API_FILES_DIR": "../dumps/api",
+  "JSON_SCHEMES_DIR": "../schemes",
+  "SKIP_FRAMES_LIST": [],
+  "QUERY_PARAMS_WEATHER": {
+    "appid": null,
+    "q": "Moscow",
+    "lang": "ru",
+    "units": "metric"
+  },
+  "RESPONSE_ERROR_400": {
+    "cod": 400,
+    "message": "Invalid date format",
+    "parameters": [
+      "date"
+    ]
+  },
+  "ENDPOINTS": [
+    "weather"
+  ]
+}
