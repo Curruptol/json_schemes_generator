@@ -2,11 +2,12 @@ import time
 import requests
 import json
 from loguru import logger
-import os
 from configparser import ConfigParser
 from typing import Optional, Any
 from requests import Response
 from urllib3.exceptions import InsecureRequestWarning
+
+from src.handlers.save_json_to_dir import SaveJSONToDir
 
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -19,20 +20,6 @@ class APIHandler:
         self._config_ini = config_ini
         self._endpoints = self._config_json.get("ENDPOINTS")
         self._max_retries = self._config_json.get("VARIABLES").get("max_retries")
-
-    @staticmethod
-    def _save_response_json_to_dir(data: dict, file_name: str, directory: str):
-        """Сохраняет ответ от API в JSON-файл.
-
-        :param data: Данные для сохранения в файл.
-        :param file_name: Имя файла для сохранения.
-        :param directory: Директория для сохранения файла.
-
-        """
-        os.makedirs(directory, exist_ok=True)
-
-        with open(os.path.join(directory, file_name), 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
 
     def _request_handler(self,
                          url: str,
@@ -99,9 +86,9 @@ class APIHandler:
         if result_data is not None:
             logger.info(f"Сохранение response в {self._config_json.get('API_FILES_DIR')}/{endpoint}/{file_name}")
 
-            APIHandler._save_response_json_to_dir(data=json.loads(result_data.content.decode("utf-8")),
-                                                  file_name=file_name,
-                                                  directory=f"{self._config_json.get('API_FILES_DIR')}/{endpoint}")
+            SaveJSONToDir.save_json_to_dir(data=result_data,
+                                           file_name=file_name,
+                                           directory=f"{self._config_json.get('API_FILES_DIR')}/{endpoint}")
 
     def _collect_response_for_weather(self):
         """Собирает успешные ответы (код 200) для weather."""
