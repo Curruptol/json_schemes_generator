@@ -4,14 +4,14 @@ import os
 
 
 class CopyJSON:
-    """Класс для копирования json из конфига в директорию проекта"""
+    """Копирование json в директорию"""
 
     def __init__(self, config_json: dict):
         self.json_error_400 = config_json.get("RESPONSE_ERROR_400")
         self.path_to_api = config_json.get("API_FILES_DIR")
 
     def copy_json_error_to_responses_dir(self):
-        """Метод копирует ошибочные респонсы из конфига в каталог с респонсами каждого эндпоинта"""
+        """Копирует json из config.json в директорию эндпоинтов и сохраняет рядом с респонсами."""
 
         endpoints_dirs = next(os.walk(self.path_to_api))[1]
 

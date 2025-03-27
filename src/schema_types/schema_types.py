@@ -4,6 +4,8 @@ from src.configs.config import config_json
 
 
 class Type(object):
+    """Получение типа данных элемента json"""
+
     schema_version = config_json.get("VARIABLES").get("json_schema_options").get("schemaVersion")
     json_type = None
     id = None
@@ -12,9 +14,10 @@ class Type(object):
     @classmethod
     def get_schema_type_for(self, t: Any):
         """
-        получение типа элемента для схемы
-        :param t:
-        :return:
+        Сопоставление типа данных json и python.
+
+        :param t: Текущий элемент.
+        :return: Тип данных python.
         """
 
         schema_type = SCHEMA_TYPES.get(t)

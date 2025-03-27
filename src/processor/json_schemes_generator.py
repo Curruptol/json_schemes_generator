@@ -7,11 +7,9 @@ import re
 from urllib.parse import urlparse
 from haralyzer import HarParser
 from loguru import logger
-from configparser import ConfigParser
 
 from src.recorder.recorder import Recorder
 from src.handlers.merge_json_schemes import MergeJSONSchemes
-from src.handlers.deduplicate_array_elements import ArrayElementDeduplicator
 
 
 class SOWASchemesGenerator:
@@ -147,27 +145,6 @@ class SOWASchemesGenerator:
 
         return string
 
-    def build_sowa_schemes(self):
-        """Точка входа для генератора"""
-        # Получение списка запросов из дампов
-        logger.debug(f"Вызов метода parse_dump_file, получение entries")
-        entries = self.parse_dump_file()
-
-        # Получение списка кадров для каждого запроса
-        logger.debug(f"Вызов метода get_frames, получение frames")
-        frames = self.get_frames(entries=entries)
-
-        # Объединение кадров запросов по методу и адресу
-        logger.debug(f"Вызов метода merge_frames, получение merged_frames")
-        merged_frames = self.merge_frames(frames=frames)
-
-        # Сохранение каждой схемы в директорию
-        for frame_name, frame in merged_frames.items():
-            logger.debug(f"Вызов метода set_path_to_schema")
-            frame = self.set_path_to_schema(frame=frame)
-            logger.debug(f"Вызов метода write_schema")
-            SOWASchemesGenerator.write_schema(frame=frame)
-
     def parse_dump_file(self) -> list:
         """Разбор файлов дампов для получения списка запросов.
 
@@ -207,29 +184,35 @@ class SOWASchemesGenerator:
 
     def get_frames(self, entries: list) -> list:
         """Получение списка кадров запроса со схемами
+
+        Если self.is_from_api True (создание схемы из .json файлов), то для каждого .json файла
+        создается request и response json схема. request schema будет всегда шаблонной.
+
+        Если self.is_from_har True (создание схемы из .har файлов), то для каждого запроса в har файле создается
+        request и response json схема. resource_type только fetch читается. Если контент запроса не был получен, то
+        записывается пустая строка.
+
+        Структура словаря в листе frames:
         {
-            'type': resource_type,
-            'method': method,
-            'url': url,
-            'api_path': api_path,
-            'schemes':
-                {
-                    'request': request_schemas,
-                    'response': response_schemas
-                }
+         'type': resource_type,
+         'method': method,
+         'url': url,
+         'api_path': api_path,
+         'schemes': {
+                     'request': request_schemas,
+                     'response': response_schemas
+                    }
         }
 
-        :param entries: Список запросов
-        :return: Список кадров со схемами
-
+        :param entries: Список файлов.
+        :return: Список фреймов со словарями, внутри которых джейсон схемы.
         """
+
         frames = []
 
         if self.is_from_har:
 
             for entry in entries:
-
-                # Преобразование URL адреса и базового пути к схеме
                 url = self.str_replace(string=entry["api_path"], replace_method="url")
                 api_path = self.str_replace(string=entry["api_path"], replace_method="api_path")
 
@@ -253,12 +236,10 @@ class SOWASchemesGenerator:
 
                     name_with_extension = os.path.splitext(api_path[1::])
                     if name_with_extension[1] != "":
-                        # Если это файл с расширением - пропуск записи, тк это статика, она не описывается схемой
                         continue
 
-                    # Для HTTP записи
                     if resource_type == "fetch" and response_content_type in self.variables["content_types"]:
-                        # Получение тела запроса
+
                         try:
                             request_json_str = json.dumps(entry["package"]["request"]["postData"]["text"])
                         except KeyError:
@@ -268,7 +249,6 @@ class SOWASchemesGenerator:
                                                                         payload=request_json_str)
                         request_schemas.append(request_schema)
 
-                        # Получение тела ответа
                         try:
                             response_json_str = entry["package"]["response"]["content"]["text"]
                         except KeyError:
@@ -328,28 +308,47 @@ class SOWASchemesGenerator:
 
         return frames
 
-    def merge_frames(self, frames: list) -> dict:
-        """Объединение кадров по методу и адресу запроса.
-
-        :param frames: Список кадров.
-        :return: Объединённые кадры запросов.
-
+    @staticmethod
+    def merge_frames(frames: list) -> dict:
         """
+        Объединение фреймов по frame_name. Группировка фреймов по frame_name.
+        Если схемы нет в merged_frames, то добавление схемы в этот словарь.
+        Мердж схемы из фрейма и merged_frames по frame_name.
+
+        Пример структуры merged_frames:
+        {
+         'fetch__api_v2_weather' : {
+                      'type': 'fetch',
+                      'method': 'get',
+                      'url': '/api/v2/weather',
+                      'api_path': '/api/v2/weather',
+                      'name': 'fetch__api_v2_weather',
+                      'schemes': {
+                            'request': {
+                                'get': json schema
+                            },
+                            'response': {
+                               'get': json schema
+                            }
+                      }
+         }
+        }
+
+        :param frames: Фреймы.
+        :return: Объединённые фреймы.
+        """
+
         merged_frames = {}
 
         for frame in frames:
-            # Формирование имени объединенного кадра
             frame_name = f"{frame['type']}__{frame['api_path'][1::].replace('/', '_')}"
             frame["name"] = frame_name
 
-            # Объединение схем текущего кадра
             for stage, schemas_list in frame["schemes"].items():
                 merged_schema = MergeJSONSchemes.merge_schemes_by_jsonmerge(schemes=frame["schemes"][stage])
                 frame["schemes"][stage] = {}
                 frame["schemes"][stage][frame["method"]] = merged_schema
 
-                # Если в списке объединенных кадров есть кадр с таким же именем,
-                # то объединение схем с объединенным кадром
                 if frame_name in merged_frames:
                     if merged_frames[frame_name]["schemes"][stage].get(frame["method"]):
                         merged_frames[frame_name]["schemes"][stage][
@@ -362,17 +361,16 @@ class SOWASchemesGenerator:
                         merged_frames[frame_name]["schemes"][stage][frame["method"]] = merged_schema
 
                 else:
-                    # Если кадра нет в списке объединенных, то добавление кадра
                     merged_frames[frame_name] = frame
 
         return merged_frames
 
     @staticmethod
     def write_schema(frame: dict):
-        """Запись схем в директорию со схемами
+        """
+        Сохранение json схем в дирекотрию.
 
-        :param frame: Кадр запроса
-
+        :param frame: Текущий фрем со схемами.
         """
         for stage, schemas in frame["schemes"].items():
             for method, schema in schemas.items():
@@ -382,3 +380,25 @@ class SOWASchemesGenerator:
                         f"{schema['absolute_schema_path'][(schema['absolute_schema_path'].find('schemes'))::]}")
                     json_schema_file.write(schema["schema"])
                     logger.info(f"Файл сохранен")
+
+    def build_sowa_schemes(self):
+        """
+        Точка входа для генератора.
+        Сначала парсятся файлы собирается лист джейсонов. Затем для каждого джейсона генерируется схема.
+        Схемы группируются по имени эндпоинта. В конце каждая схема сохраняется в дирекотрию.
+        """
+
+        logger.debug(f"Вызов метода parse_dump_file, получение entries")
+        entries = self.parse_dump_file()
+
+        logger.debug(f"Вызов метода get_frames, получение frames")
+        frames = self.get_frames(entries=entries)
+
+        logger.debug(f"Вызов метода merge_frames, получение merged_frames")
+        merged_frames = self.merge_frames(frames=frames)
+
+        for frame_name, frame in merged_frames.items():
+            logger.debug(f"Вызов метода set_path_to_schema")
+            frame = self.set_path_to_schema(frame=frame)
+            logger.debug(f"Вызов метода write_schema")
+            SOWASchemesGenerator.write_schema(frame=frame)

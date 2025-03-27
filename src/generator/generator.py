@@ -25,23 +25,13 @@ def json_path(obj, *args):
 
 
 class SchemaGenerator(object):
-    """Класс для генерации схемы JSON-схемы на основе входящего объекта."""
+    """Генерация JSON-схемы на основе входящего json."""
 
     def __init__(self, base_object):
-        """Конструктор класса.
-
-        :param base_object: Базовый объект, на основании которого будет построена схема.
-
-        """
         self._base_object = base_object
 
     @property
     def base_object(self):
-        """Геттер для базового объекта.
-
-        :return: Базовый объект.
-
-        """
         return self._base_object
 
     @classmethod
@@ -69,14 +59,20 @@ class SchemaGenerator(object):
                 name_of_element_object: str = None,
                 first_level: bool = True,
                 options: dict = None) -> dict:
-        """Преобразует базовый объект в словарь, соответствующий схеме JSON-схемы.
+        """
+        Преобразует текущий json объект в словарь python, соответствующий схеме JSON-схемы.
+        Рекурсивно обходит каждый объект, массив, элемент джейсона.
+        В зависимости от типа данных текущего элемента создает кусок json схемы.
+        Если first_level True, то указывается только версия схемы и additionalProperties.
+        С помощью классов из schema_types.Type определяется тип данных элемента.
+        Значения для json схемы берутся из config.json аргумента options.
+        Для массива объектов создается джейсон схема для каждого элемента массива, затем мерджится в одну схему.
 
         :param base_object: Объект, который преобразуется в схему. Если не указан, используется базовый объект.
-        :param base_object_name: Наименование объекта.
+        :param base_object_name: Наименование текущего объекта.
         :param first_level: Флаг, определяющий, является ли этот уровень первым уровнем рекурсии.
         :param options: Дополнительные параметры для настройки схемы.
         :return: Словарь, представляющий собой JSON-схему.
-
         """
         if options is None:
             options = {}
@@ -152,7 +148,7 @@ class SchemaGenerator(object):
                             self.to_dict(base_object=item, first_level=False, options=options))
 
                     merged_items = MergeJSONSchemes.merge_schemes_from_list_str_by_mergedeep(
-                        schemas_list=schema_dict["items"])
+                        schemes=schema_dict["items"])
 
                     array_element_deduplcator_instance = ArrayElementDeduplicator(schema=merged_items)
                     merged_items = array_element_deduplcator_instance.deduplicate_array_of_types_in_response_scheme()
@@ -170,10 +166,10 @@ class SchemaGenerator(object):
         return schema_dict
 
     def to_json(self, options: dict) -> str:
-        """Преобразует схему в строку JSON.
+        """
+        Вызывает генератор схемы.
 
         :param options: Параметры для настройки схемы.
         :return: Строку JSON, представляющую схему.
-
         """
         return json.dumps(self.to_dict(options=options))
